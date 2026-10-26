@@ -45,7 +45,7 @@ module.exports = async (req, res) => {
     const sheets = google.sheets({ version: 'v4', auth });
     
     const SHEET_ID_KPI = process.env.SHEET_ID_KPI;
-    const SHEET_ID_EMP = process.env.SHEET_ID_EMP;
+    const SHEET_ID_EMP = process.env.SHEET_ID_EMP || process.env.SHEET_ID_KPI; // Employee Sheet ID သီးသန့် (မရှိရင် KPI ID ကို ယူမည်)
 
     // =========================================================================
     // 🌟 GET REQUEST (Employee ID Lookup & Raw Data Fetches)
@@ -91,9 +91,10 @@ module.exports = async (req, res) => {
         }
 
         try {
+          // SHEET_ID_EMP (Employee Sheet အသစ်) မှ Tab နာမည်ကို ရှာမည်
           const empTab = await getTabTitle(sheets, SHEET_ID_EMP, "Mgr Fb-30%");
           const empRes = await sheets.spreadsheets.values.get({
-            spreadsheetId: SHEET_ID_EMP,
+            spreadsheetId: SHEET_ID_EMP, // <-- Sheet အသစ်၏ ID ကို သုံးထားသည်
             range: `'${empTab}'!A2:B3000`,
             valueRenderOption: 'FORMATTED_VALUE'
           });
@@ -242,7 +243,7 @@ module.exports = async (req, res) => {
         if (sameStaffRecord) {
           return jsonResponse(res, 200, {
             status: "need_duplicate_reason",
-            message: `ဤ Customer အား ယနေ့အတွင်း သင်ကိုယ်တိုင် (${sameDayRecords.length}) ကြိမ်တင်ပြီးပါပြီ။ Connection မကောင်းလို့ KPIထပ်တင်တာဆိုရင် "မှားတင်မိတာပါ" ကိုနှိပ်ပေးပါ။ နှစ်ခါရှင်းလိုက်ရတာဆိုရင် Duplicate Reason ထည့်ပေးပါ။`
+            message: `ဤ Customer အား ယနေ့အတွင်း သင်ကိုယ်တိုင် (${sameDayRecords.length}) ကြိမ်တင်ပြီးပါပြီ။ Connection မကောင်းလို့ ထပ်တင်တာဆိုရင် "မှားတင်မိတာပါ" ကိုနှိပ်ပေးပါ။ နှစ်ခါရှင်းလိုက်ရတာဆိုရင် Duplicate Reason ထည့်ပေးပါ။`
           });
         } else {
           const otherStaff = sameDayRecords[0];
@@ -277,7 +278,7 @@ module.exports = async (req, res) => {
 
         return jsonResponse(res, 200, {
           status: "success",
-          message: "အောင်မြင်စွာ သိမ်းဆည်းပြီးပါပြီ။"
+          message: "Duplicate Sheet သို့ အောင်မြင်စွာ သိမ်းဆည်းပြီးပါပြီ။"
         });
       }
 
