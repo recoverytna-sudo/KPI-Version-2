@@ -45,7 +45,7 @@ module.exports = async (req, res) => {
     const sheets = google.sheets({ version: 'v4', auth });
     
     const SHEET_ID_KPI = process.env.SHEET_ID_KPI;
-    const SHEET_ID_EMP = process.env.SHEET_ID_EMP || process.env.SHEET_ID_KPI; // Employee Sheet ID သီးသန့် (မရှိရင် KPI ID ကို ယူမည်)
+    const SHEET_ID_EMP = process.env.SHEET_ID_EMP || process.env.SHEET_ID_KPI;
 
     // =========================================================================
     // 🌟 GET REQUEST (Employee ID Lookup & Raw Data Fetches)
@@ -91,10 +91,9 @@ module.exports = async (req, res) => {
         }
 
         try {
-          // SHEET_ID_EMP (Employee Sheet အသစ်) မှ Tab နာမည်ကို ရှာမည်
           const empTab = await getTabTitle(sheets, SHEET_ID_EMP, "Mgr Fb-30%");
           const empRes = await sheets.spreadsheets.values.get({
-            spreadsheetId: SHEET_ID_EMP, // <-- Sheet အသစ်၏ ID ကို သုံးထားသည်
+            spreadsheetId: SHEET_ID_EMP,
             range: `'${empTab}'!A2:B3000`,
             valueRenderOption: 'FORMATTED_VALUE'
           });
@@ -128,7 +127,7 @@ module.exports = async (req, res) => {
     }
 
     // =========================================================================
-    // 🌟 POST REQUEST (Validation, Record to KPI & Duplicate Sheets)
+    // 🌟 POST REQUEST (Validation & Double Sheet Scan Logic)
     // =========================================================================
     if (req.method === 'POST') {
       let bodyData = req.body;
@@ -159,14 +158,25 @@ module.exports = async (req, res) => {
       const kpiTab = await getTabTitle(sheets, SHEET_ID_KPI, "KPI Calculation");
       const dupTab = await getTabTitle(sheets, SHEET_ID_KPI, "Duplicate");
 
-      const kpiRes = await sheets.spreadsheets.values.get({
-        spreadsheetId: SHEET_ID_KPI,
-        range: `'${kpiTab}'!A:J`
-      }).catch((err) => {
-        throw new Error("KPI Sheet ဖတ်မရပါ။ Error: " + err.message);
-      });
+      // 🔍 Sheet ၂ ခုစလုံး ('KPI Calculation' & 'Duplicate') မှ Data များကို ပြိုင်တူ ဆွဲထုတ်ခြင်း
+      const [kpiRes, dupRes] = await Promise.all([
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SHEET_ID_KPI,
+          range: `'${kpiTab}'!A:J`
+        }).catch(() => ({ data: { values: [] } })),
+        sheets.spreadsheets.values.get({
+          spreadsheetId: SHEET_ID_KPI,
+          range: `'${dupTab}'!A:J`
+        }).catch(() => ({ data: { values: [] } }))
+      ]);
 
-      const allRows = kpiRes.data.values || [];
+      const kpiRows = kpiRes.data.values || [];
+      const dupRows = dupRes.data.values || [];
+
+      // Sheet (၂) ခုလုံးမှ တင်ထားသမျှ Data များကို ပေါင်းစည်းခြင်း
+      const combinedRows = [];
+      for (let i = 1; i < kpiRows.length; i++) combinedRows.push(kpiRows[i]);
+      for (let j = 1; j < dupRows.length; j++) combinedRows.push(dupRows[j]);
 
       // MM Time (UTC+6:30) Timestamp
       const now = new Date();
@@ -192,8 +202,9 @@ module.exports = async (req, res) => {
 
       const cleanCurrentId = String(serviceId).trim().toLowerCase();
 
-      for (let i = 1; i < allRows.length; i++) {
-        const row = allRows[i];
+      // Sheet ၂ ခုပေါင်းထားသော combinedRows ထဲတွင် ၇ရက်အတွင်း/၁ရက်အတွင်း Duplicate Scan ဖတ်ခြင်း
+      for (let i = 0; i < combinedRows.length; i++) {
+        const row = combinedRows[i];
         const rowDateStr = row[1] ? String(row[1]).replace("'", "").trim() : "";
         const rowServiceId = row[3] ? String(row[3]).trim().toLowerCase() : "";
 
@@ -216,7 +227,7 @@ module.exports = async (req, res) => {
         }
       }
 
-      // 🔴 Check 1: ၇ ရက်အတွင်း ၄ ကြိမ် (၃ကြိမ်ထက်ပို) ဖြစ်လျှင် လက်မခံပါ
+      // 🔴 Check 1: ၇ ရက်အတွင်း ၃ ကြိမ် ရောက်ပြီး ထပ်တင်ပါက (၄ ကြိမ်မြောက်ဖြစ်လျှင်) တင်ခွင့်မပြုပါ
       if (sevenDaysCount >= 3) {
         return jsonResponse(res, 200, {
           status: "blocked",
@@ -235,7 +246,7 @@ module.exports = async (req, res) => {
       let finalDupReason = (duplicateReason === "Others") ? otherDuplicateReason : duplicateReason;
       const sheetDateValue = "'" + formattedDate;
 
-      // 🟡 Check 2: တစ်ရက်အတွင်း တင်ထားပြီးသား ရှိလျှင် (Duplicate Check)
+      // 🟡 Check 2: Sheet ၂ ခုလုံးမှ Scan ဖတ်၍ ယနေ့တွင် Duplicate ရှိနေပါက ဆုံးဖြတ်ခြင်း
       if (sameDayRecords.length > 0 && !duplicateReason) {
         const currentFinanceId = String(financeId).trim();
         const sameStaffRecord = sameDayRecords.find(r => r.financeId === currentFinanceId);
@@ -278,7 +289,7 @@ module.exports = async (req, res) => {
 
         return jsonResponse(res, 200, {
           status: "success",
-          message: "Duplicate Sheet သို့ အောင်မြင်စွာ သိမ်းဆည်းပြီးပါပြီ။"
+          message: "အောင်မြင်စွာ သိမ်းဆည်းပြီးပါပြီ။"
         });
       }
 
