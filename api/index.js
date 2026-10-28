@@ -219,8 +219,8 @@ module.exports = async (req, res) => {
             }
             if (rDate.toDateString() === targetDate.toDateString()) {
               sameDayRecords.push({
-                financeId: row[5] ? String(row[5]).trim() : "",
-                financeName: row[6] ? String(row[6]).trim() : ""
+                financeName: row[5] ? String(row[5]).trim() : "",
+                financeId: row[6] ? String(row[6]).trim() : ""
               });
             }
           }
@@ -265,7 +265,7 @@ module.exports = async (req, res) => {
         }
       }
 
-      // 🟢 Duplicate Reason ပါလာလျှင် Duplicate Sheet သို့ သိမ်းဆည်းခြင်း
+      // 🟢 Duplicate Reason ပါလာလျှင် Duplicate Sheet သို့ သိမ်းဆည်းခြင်း (Finance Name က အရင်၊ Finance ID က အနောက်)
       if (duplicateReason) {
         const dupRecord = [[
           timestamp,
@@ -273,8 +273,8 @@ module.exports = async (req, res) => {
           srName,
           serviceId,
           customerName,
-          financeId,
           financeName,
+          financeId,
           reason,
           finalResolution || "",
           finalDupReason || ""
@@ -293,15 +293,15 @@ module.exports = async (req, res) => {
         });
       }
 
-      // 🟢 Normal Insert: KPI Calculation Sheet သို့ သိမ်းဆည်းခြင်း
+      // 🟢 Normal Insert: KPI Calculation Sheet သို့ သိမ်းဆည်းခြင်း (Finance Name က အရင်၊ Finance ID က အနောက်)
       const kpiRecord = [[
         timestamp,
         sheetDateValue,
         srName,
         serviceId,
         customerName,
-        financeId,
         financeName,
+        financeId,
         reason,
         finalResolution || ""
       ]];
