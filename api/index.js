@@ -156,7 +156,7 @@ module.exports = async (req, res) => {
       }
 
       const kpiTab = await getTabTitle(sheets, SHEET_ID_KPI, "KPI Calculation");
-      const dupTab = await getTabTitle(sheets, SHEET_ID_KPI, "Duplicate");
+      const dupTab = await getTabTitle(sheets, SHEET_ID_KPI, "KPI Duplicate");
 
       // 🔍 Sheet ၂ ခုစလုံး ('KPI Calculation' & 'Duplicate') မှ Data များကို ပြိုင်တူ ဆွဲထုတ်ခြင်း
       const [kpiRes, dupRes] = await Promise.all([
